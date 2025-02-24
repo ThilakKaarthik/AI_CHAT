@@ -19,38 +19,49 @@ function ResetPasswordComponent() {
   const router = useRouter();
   const searchParams = useSearchParams(); // Wrapped in Suspense at the parent level
 
-  useEffect(() => {
-    const token = searchParams.get("token");
-    const userEmail = searchParams.get("email"); // Extract email from URL
+ useEffect(() => {
+  const token = searchParams.get("token");
+  const userEmail = searchParams.get("email"); // Extract email from URL
 
-    console.log("🔍 Debug - Reset Token:", token);
-    console.log("🔍 Debug - User Email:", userEmail);
+  console.log("🔍 Debug - Reset Token:", token);
+  console.log("🔍 Debug - User Email:", userEmail);
 
-    if (!token || !userEmail) {
-      toast.error("Invalid or missing reset link. Please try again.");
+  if (!token || !userEmail) {
+    toast.error("Invalid or missing reset link. Please try again.");
+    return;
+  }
+
+  setEmail(userEmail); // Store email in state
+
+  const verifySession = async () => {
+    const { error, data } = await supabase.auth.verifyOtp({
+      type: "recovery",
+      token,
+      email: userEmail, // ✅ Ensure email is included
+    });
+
+    if (error) {
+      console.error("🚨 Supabase Error:", error.message);
+      toast.error("Session verification failed. Try resetting again.");
       return;
     }
 
-    setEmail(userEmail); // Store email in state
+    console.log("✅ Session Restored:", data);
 
-    const verifySession = async () => {
-      const { error, data } = await supabase.auth.verifyOtp({
-        type: "recovery",
-        token,
-        email: userEmail, // ✅ Pass the email
-      });
+    // ✅ Manually refresh session to ensure authentication persists
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.error("🚨 Session Refresh Error:", refreshError.message);
+      toast.error("Failed to refresh session. Try requesting a new link.");
+      return;
+    }
 
-      if (error) {
-        console.error("🚨 Supabase Error:", error.message);
-        toast.error("Session verification failed. Try resetting again.");
-      } else {
-        console.log("✅ Session Restored:", data);
-        setSessionRestored(true);
-      }
-    };
+    setSessionRestored(true);
+  };
 
-    verifySession();
-  }, [searchParams]);
+  verifySession();
+}, [searchParams]);
+
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
