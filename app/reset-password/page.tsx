@@ -20,9 +20,12 @@ function ResetPasswordComponent() {
 
   useEffect(() => {
     const token = searchParams.get("token");
+    console.log("Reset Token:", token); // Debugging
+    
     if (token) {
       supabase.auth.exchangeCodeForSession(token).then(({ error }) => {
         if (error) {
+          console.error("Supabase Error:", error); // Log error details
           toast.error("Session exchange failed. Try resetting again.", {
             position: "bottom-right",
             className: "bg-destructive text-destructive-foreground",
