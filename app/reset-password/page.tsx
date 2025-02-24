@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 function ResetPasswordComponent() {
+  const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,24 +21,28 @@ function ResetPasswordComponent() {
 
   useEffect(() => {
     const token = searchParams.get("token");
+    const userEmail = searchParams.get("email"); // Extract email from URL
 
-    console.log("🔍 Debug - Reset Token:", token); // Check if the token is received
+    console.log("🔍 Debug - Reset Token:", token);
+    console.log("🔍 Debug - User Email:", userEmail);
 
-    if (!token) {
-      toast.error("Reset token is missing. Please request a new reset link.");
+    if (!token || !userEmail) {
+      toast.error("Invalid or missing reset link. Please try again.");
       return;
     }
 
-    // Ensure async handling is correct
+    setEmail(userEmail); // Store email in state
+
     const verifySession = async () => {
       const { error, data } = await supabase.auth.verifyOtp({
         type: "recovery",
         token,
+        email: userEmail, // ✅ Pass the email
       });
 
       if (error) {
         console.error("🚨 Supabase Error:", error.message);
-        toast.error("Session exchange failed. Try resetting again.");
+        toast.error("Session verification failed. Try resetting again.");
       } else {
         console.log("✅ Session Restored:", data);
         setSessionRestored(true);
@@ -96,6 +101,18 @@ function ResetPasswordComponent() {
         </CardHeader>
         <form onSubmit={handleResetPassword}>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
