@@ -20,21 +20,31 @@ function ResetPasswordComponent() {
 
   useEffect(() => {
     const token = searchParams.get("token");
-    console.log("Reset Token:", token); // Debugging
-    
-    if (token) {
-      supabase.auth.exchangeCodeForSession(token).then(({ error }) => {
-        if (error) {
-          console.error("Supabase Error:", error); // Log error details
-          toast.error("Session exchange failed. Try resetting again.", {
-            position: "bottom-right",
-            className: "bg-destructive text-destructive-foreground",
-          });
-        } else {
-          setSessionRestored(true);
-        }
-      });
+
+    console.log("🔍 Debug - Reset Token:", token); // Check if the token is received
+
+    if (!token) {
+      toast.error("Reset token is missing. Please request a new reset link.");
+      return;
     }
+
+    // Ensure async handling is correct
+    const verifySession = async () => {
+      const { error, data } = await supabase.auth.verifyOtp({
+        type: "recovery",
+        token,
+      });
+
+      if (error) {
+        console.error("🚨 Supabase Error:", error.message);
+        toast.error("Session exchange failed. Try resetting again.");
+      } else {
+        console.log("✅ Session Restored:", data);
+        setSessionRestored(true);
+      }
+    };
+
+    verifySession();
   }, [searchParams]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -42,19 +52,13 @@ function ResetPasswordComponent() {
     setLoading(true);
 
     if (!sessionRestored) {
-      toast.error("Session is missing. Please request a new reset link.", {
-        position: "bottom-right",
-        className: "bg-destructive text-destructive-foreground",
-      });
+      toast.error("Session is missing. Please request a new reset link.");
       setLoading(false);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match!", {
-        position: "bottom-right",
-        className: "bg-destructive text-destructive-foreground",
-      });
+      toast.error("Passwords do not match!");
       setLoading(false);
       return;
     }
@@ -62,11 +66,7 @@ function ResetPasswordComponent() {
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{6,}$/;
     if (!passwordRegex.test(newPassword)) {
       toast.error(
-        "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character.",
-        {
-          position: "bottom-right",
-          className: "bg-destructive text-destructive-foreground",
-        }
+        "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character."
       );
       setLoading(false);
       return;
@@ -75,16 +75,10 @@ function ResetPasswordComponent() {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
 
     if (error) {
-      toast.error(error.message || "Failed to reset password.", {
-        position: "bottom-right",
-        className: "bg-destructive text-destructive-foreground",
-      });
+      console.error("🚨 Supabase Password Reset Error:", error.message);
+      toast.error(error.message || "Failed to reset password.");
     } else {
-      toast.success("Password reset successfully!", {
-        position: "bottom-right",
-        className: "bg-primary text-primary-foreground",
-      });
-
+      toast.success("Password reset successfully!");
       router.push("/login");
     }
 
