@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/card";
@@ -9,95 +9,80 @@ import { Label } from "@/components/label";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
-function ResetPasswordComponent() {
-  const [email, setEmail] = useState("");
+export default function ResetPasswordPage() {
+  // State hooks for new password, confirm password, and loading state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sessionRestored, setSessionRestored] = useState(false);
 
+  // Hook for navigation (router)
   const router = useRouter();
-  const searchParams = useSearchParams(); // Wrapped in Suspense at the parent level
 
- useEffect(() => {
-  const token = searchParams.get("token");
-  const userEmail = searchParams.get("email"); // Extract email from URL
+  // Password validation regex: Password must have:
+  // - At least 6 characters
+  // - At least 1 lowercase letter
+  // - At least 1 uppercase letter
+  // - At least 1 special character
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{6,}$/;
 
-  console.log("🔍 Debug - Reset Token:", token);
-  console.log("🔍 Debug - User Email:", userEmail);
-
-  if (!token || !userEmail) {
-    toast.error("Invalid or missing reset link. Please try again.");
-    return;
-  }
-
-  setEmail(userEmail); // Store email in state
-
-  const verifySession = async () => {
-    const { error, data } = await supabase.auth.verifyOtp({
-      type: "recovery",
-      token,
-      email: userEmail, // ✅ Ensure email is included
-    });
-
-    if (error) {
-      console.error("🚨 Supabase Error:", error.message);
-      toast.error("Session verification failed. Try resetting again.");
-      return;
-    }
-
-    console.log("✅ Session Restored:", data);
-
-    // ✅ Manually refresh session to ensure authentication persists
-    const { error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError) {
-      console.error("🚨 Session Refresh Error:", refreshError.message);
-      toast.error("Failed to refresh session. Try requesting a new link.");
-      return;
-    }
-
-    setSessionRestored(true);
-  };
-
-  verifySession();
-}, [searchParams]);
-
-
+  // Main function to handle the password reset logic
   const handleResetPassword = async (e: React.FormEvent) => {
+    // Prevent the default form submission behavior
     e.preventDefault();
+    
+    // Set loading state to true when the password reset process begins
     setLoading(true);
 
-    if (!sessionRestored) {
-      toast.error("Session is missing. Please request a new reset link.");
-      setLoading(false);
-      return;
-    }
-
+    // Step 1: Check if the new password and confirmation password match
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match!");
+      // Show an error toast if passwords don't match
+      toast.error("Passwords do not match!", {
+        position: "bottom-right",
+        className: "bg-destructive text-destructive-foreground", // Styling for error
+      });
+      // End the loading state
       setLoading(false);
-      return;
+      return; // Exit function early if passwords do not match
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{6,}$/;
+    // Step 2: Validate the new password using a regex pattern
     if (!passwordRegex.test(newPassword)) {
+      // Show an error toast if password does not meet criteria
       toast.error(
-        "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character."
+        "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character.",
+        {
+          position: "bottom-right",
+          className: "bg-destructive text-destructive-foreground", // Styling for error
+        }
       );
+      // End the loading state
       setLoading(false);
-      return;
+      return; // Exit function early if password is invalid
     }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    // Step 3: Attempt to update the user's password in Supabase
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword, // Set the new password for the user
+    });
 
+    // Step 4: Handle errors from the password update attempt
     if (error) {
-      console.error("🚨 Supabase Password Reset Error:", error.message);
-      toast.error(error.message || "Failed to reset password.");
+      // Show an error toast if there is an issue updating the password
+      toast.error(error.message || "Failed to reset password.", {
+        position: "bottom-right",
+        className: "bg-destructive text-destructive-foreground", // Styling for error
+      });
     } else {
-      toast.success("Password reset successfully!");
+      // Show a success toast if password reset is successful
+      toast.success("Password reset successfully!", {
+        position: "bottom-right",
+        className: "bg-primary text-primary-foreground", // Styling for success
+      });
+      // Redirect the user to the login page after success
       router.push("/login");
     }
 
+    // End the loading state
     setLoading(false);
   };
 
@@ -112,18 +97,6 @@ function ResetPasswordComponent() {
         </CardHeader>
         <form onSubmit={handleResetPassword}>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
@@ -160,13 +133,5 @@ function ResetPasswordComponent() {
         </form>
       </Card>
     </div>
-  );
-}
-
-export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <ResetPasswordComponent />
-    </Suspense>
   );
 }
