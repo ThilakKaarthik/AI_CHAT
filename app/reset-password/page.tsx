@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/card";
@@ -10,79 +10,95 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 export default function ResetPasswordPage() {
-  // State hooks for new password, confirm password, and loading state
+  // State hooks
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessionRestored, setSessionRestored] = useState(false);
 
   // Hook for navigation (router)
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Password validation regex: Password must have:
-  // - At least 6 characters
-  // - At least 1 lowercase letter
-  // - At least 1 uppercase letter
-  // - At least 1 special character
+  // Password validation regex: 
+  // - At least 6 characters, 1 lowercase, 1 uppercase, 1 special character
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{6,}$/;
 
-  // Main function to handle the password reset logic
+  // Restore session using Supabase exchangeCodeForSession()
+  useEffect(() => {
+    const token = searchParams.get("token");
+    if (token) {
+      supabase.auth.exchangeCodeForSession(token)
+        .then(({ error }) => {
+          if (error) {
+            toast.error("Session exchange failed. Try resetting again.", {
+              position: "bottom-right",
+              className: "bg-destructive text-destructive-foreground",
+            });
+          } else {
+            setSessionRestored(true);
+          }
+        });
+    }
+  }, [searchParams]);
+
+  // Handle password reset
   const handleResetPassword = async (e: React.FormEvent) => {
-    // Prevent the default form submission behavior
     e.preventDefault();
-    
-    // Set loading state to true when the password reset process begins
     setLoading(true);
 
-    // Step 1: Check if the new password and confirmation password match
-    if (newPassword !== confirmPassword) {
-      // Show an error toast if passwords don't match
-      toast.error("Passwords do not match!", {
+    // Check if session was successfully restored
+    if (!sessionRestored) {
+      toast.error("Session is missing. Please request a new reset link.", {
         position: "bottom-right",
-        className: "bg-destructive text-destructive-foreground", // Styling for error
+        className: "bg-destructive text-destructive-foreground",
       });
-      // End the loading state
       setLoading(false);
-      return; // Exit function early if passwords do not match
+      return;
     }
 
-    // Step 2: Validate the new password using a regex pattern
+    // Step 1: Password match validation
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match!", {
+        position: "bottom-right",
+        className: "bg-destructive text-destructive-foreground",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Step 2: Password strength validation
     if (!passwordRegex.test(newPassword)) {
-      // Show an error toast if password does not meet criteria
       toast.error(
         "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character.",
         {
           position: "bottom-right",
-          className: "bg-destructive text-destructive-foreground", // Styling for error
+          className: "bg-destructive text-destructive-foreground",
         }
       );
-      // End the loading state
       setLoading(false);
-      return; // Exit function early if password is invalid
+      return;
     }
 
-    // Step 3: Attempt to update the user's password in Supabase
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword, // Set the new password for the user
-    });
+    // Step 3: Update password using Supabase
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
 
-    // Step 4: Handle errors from the password update attempt
+    // Step 4: Handle errors or success
     if (error) {
-      // Show an error toast if there is an issue updating the password
       toast.error(error.message || "Failed to reset password.", {
         position: "bottom-right",
-        className: "bg-destructive text-destructive-foreground", // Styling for error
+        className: "bg-destructive text-destructive-foreground",
       });
     } else {
-      // Show a success toast if password reset is successful
       toast.success("Password reset successfully!", {
         position: "bottom-right",
-        className: "bg-primary text-primary-foreground", // Styling for success
+        className: "bg-primary text-primary-foreground",
       });
-      // Redirect the user to the login page after success
+
+      // Redirect user to login page
       router.push("/login");
     }
 
-    // End the loading state
     setLoading(false);
   };
 
