@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, SetStateAction } from "react";
+import { useState, useEffect, SetStateAction, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Session } from "inspector";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,20 +18,19 @@ export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Fetch session on mount (especially needed for password recovery links)
   useEffect(() => {
     const fetchSession = async () => {
-      const type = searchParams.get("type"); // Check if the URL contains 'type=recovery'
-      
+      const type = searchParams.get("type");
+
       if (type === "recovery") {
         const { data, error } = await supabase.auth.getSession();
         if (error || !data.session) {
           toast.error("Session missing or expired. Please request a new reset link.", {
             position: "bottom-right",
           });
-          router.push("/forgot-password"); // Redirect user if session is missing
+          router.push("/forgot-password");
         } else {
-          setSession(data.session as unknown as SetStateAction<Session | null>); // Store session if available
+          setSession(data.session as unknown as SetStateAction<Session | null>);
         }
       }
     };
@@ -127,5 +126,13 @@ export default function ResetPasswordPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
