@@ -1,66 +1,90 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/card";
+
+
 import { Label } from "@/components/label";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 export default function ResetPasswordPage() {
+  // State hooks for new password, confirm password, and loading state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const accessToken = searchParams.get("token"); // Get reset token from URL
 
+  // Hook for navigation (router)
+  const router = useRouter();
+
+  // Password validation regex: Password must have:
+  // - At least 6 characters
+  // - At least 1 lowercase letter
+  // - At least 1 uppercase letter
+  // - At least 1 special character
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{6,}$/;
 
-  // ✅ Set session when component mounts
-  useEffect(() => {
-    if (accessToken) {
-      supabase.auth.setSession({ access_token: accessToken, refresh_token: "" })
-        .then(({ error }) => {
-          if (error) {
-            console.error("Session setup error:", error.message);
-            toast.error("Session expired or invalid. Request a new reset email.");
-            router.push("/forgot-password");
-          }
-        });
-    }
-  }, [accessToken, router]);
-
+  // Main function to handle the password reset logic
   const handleResetPassword = async (e: React.FormEvent) => {
+    // Prevent the default form submission behavior
     e.preventDefault();
+    
+    // Set loading state to true when the password reset process begins
     setLoading(true);
 
+    // Step 1: Check if the new password and confirmation password match
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match!");
+      // Show an error toast if passwords don't match
+      toast.error("Passwords do not match!", {
+        position: "bottom-right",
+        className: "bg-destructive text-destructive-foreground", // Styling for error
+      });
+      // End the loading state
       setLoading(false);
-      return;
+      return; // Exit function early if passwords do not match
     }
 
+    // Step 2: Validate the new password using a regex pattern
     if (!passwordRegex.test(newPassword)) {
+      // Show an error toast if password does not meet criteria
       toast.error(
-        "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character."
+        "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character.",
+        {
+          position: "bottom-right",
+          className: "bg-destructive text-destructive-foreground", // Styling for error
+        }
       );
+      // End the loading state
       setLoading(false);
-      return;
+      return; // Exit function early if password is invalid
     }
 
-    // ✅ Update the password
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    // Step 3: Attempt to update the user's password in Supabase
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword, // Set the new password for the user
+    });
 
+    // Step 4: Handle errors from the password update attempt
     if (error) {
-      toast.error(error.message || "Failed to reset password.");
+      // Show an error toast if there is an issue updating the password
+      toast.error(error.message || "Failed to reset password.", {
+        position: "bottom-right",
+        className: "bg-destructive text-destructive-foreground", // Styling for error
+      });
     } else {
-      toast.success("Password reset successfully! Redirecting to login...");
-      setTimeout(() => router.push("/login"), 2000);
+      // Show a success toast if password reset is successful
+      toast.success("Password reset successfully!", {
+        position: "bottom-right",
+        className: "bg-primary text-primary-foreground", // Styling for success
+      });
+      // Redirect the user to the login page after success
+      router.push("/login");
     }
 
+    // End the loading state
     setLoading(false);
   };
 
