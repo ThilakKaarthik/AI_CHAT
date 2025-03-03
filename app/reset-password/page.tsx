@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, SetStateAction } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
@@ -8,12 +8,13 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/card";
 import { Label } from "@/components/label";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { Session } from "inspector";
 
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState<Session | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -30,7 +31,7 @@ export default function ResetPasswordPage() {
           });
           router.push("/forgot-password"); // Redirect user if session is missing
         } else {
-          setSession(data.session); // Store session if available
+          setSession(data.session as unknown as SetStateAction<Session | null>); // Store session if available
         }
       }
     };
