@@ -1,90 +1,81 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/card";
-
-
 import { Label } from "@/components/label";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 export default function ResetPasswordPage() {
-  // State hooks for new password, confirm password, and loading state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Hook for navigation (router)
+  const [session, setSession] = useState(null);
+  const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Password validation regex: Password must have:
-  // - At least 6 characters
-  // - At least 1 lowercase letter
-  // - At least 1 uppercase letter
-  // - At least 1 special character
+  // Fetch session on mount (especially needed for password recovery links)
+  useEffect(() => {
+    const fetchSession = async () => {
+      const type = searchParams.get("type"); // Check if the URL contains 'type=recovery'
+      
+      if (type === "recovery") {
+        const { data, error } = await supabase.auth.getSession();
+        if (error || !data.session) {
+          toast.error("Session missing or expired. Please request a new reset link.", {
+            position: "bottom-right",
+          });
+          router.push("/forgot-password"); // Redirect user if session is missing
+        } else {
+          setSession(data.session); // Store session if available
+        }
+      }
+    };
+
+    fetchSession();
+  }, [searchParams, router]);
+
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{6,}$/;
 
-  // Main function to handle the password reset logic
   const handleResetPassword = async (e: React.FormEvent) => {
-    // Prevent the default form submission behavior
     e.preventDefault();
-    
-    // Set loading state to true when the password reset process begins
     setLoading(true);
 
-    // Step 1: Check if the new password and confirmation password match
     if (newPassword !== confirmPassword) {
-      // Show an error toast if passwords don't match
-      toast.error("Passwords do not match!", {
-        position: "bottom-right",
-        className: "bg-destructive text-destructive-foreground", // Styling for error
-      });
-      // End the loading state
+      toast.error("Passwords do not match!", { position: "bottom-right" });
       setLoading(false);
-      return; // Exit function early if passwords do not match
+      return;
     }
 
-    // Step 2: Validate the new password using a regex pattern
     if (!passwordRegex.test(newPassword)) {
-      // Show an error toast if password does not meet criteria
       toast.error(
         "Password must be at least 6 characters long, include one uppercase letter, one lowercase letter, and one special character.",
-        {
-          position: "bottom-right",
-          className: "bg-destructive text-destructive-foreground", // Styling for error
-        }
+        { position: "bottom-right" }
       );
-      // End the loading state
       setLoading(false);
-      return; // Exit function early if password is invalid
+      return;
     }
 
-    // Step 3: Attempt to update the user's password in Supabase
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword, // Set the new password for the user
-    });
+    if (!session) {
+      toast.error("Session expired or missing. Please request a new reset link.", {
+        position: "bottom-right",
+      });
+      setLoading(false);
+      return;
+    }
 
-    // Step 4: Handle errors from the password update attempt
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+
     if (error) {
-      // Show an error toast if there is an issue updating the password
-      toast.error(error.message || "Failed to reset password.", {
-        position: "bottom-right",
-        className: "bg-destructive text-destructive-foreground", // Styling for error
-      });
+      toast.error(error.message || "Failed to reset password.", { position: "bottom-right" });
     } else {
-      // Show a success toast if password reset is successful
-      toast.success("Password reset successfully!", {
-        position: "bottom-right",
-        className: "bg-primary text-primary-foreground", // Styling for success
-      });
-      // Redirect the user to the login page after success
+      toast.success("Password reset successfully!", { position: "bottom-right" });
       router.push("/login");
     }
 
-    // End the loading state
     setLoading(false);
   };
 
